@@ -20,6 +20,7 @@ func server(addr string, handler http.Handler, stop <-chan os.Signal) error {
 
 	go func() {
 		<-stop
+		fmt.Println("shutdown~~")
 		s.Shutdown(context.Background())
 	}()
 
@@ -43,7 +44,7 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 
-	signal.Notify(stop, syscall.SIGQUIT)
+	signal.Notify(stop, syscall.SIGQUIT, syscall.SIGTERM)
 
 	g.Go(func() error {
 		return server(":8080", &appHandle{}, stop)
