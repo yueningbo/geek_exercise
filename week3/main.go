@@ -26,14 +26,6 @@ func server(addr string, handler http.Handler, stop <-chan os.Signal) error {
 	return s.ListenAndServe()
 }
 
-func serverApp(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello App! %s", time.Now())
-}
-
-func serverDebug(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello debug! %s", time.Now())
-}
-
 type appHandle struct{}
 
 func (app *appHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
