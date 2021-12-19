@@ -6,14 +6,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"sync/errgroup"
 )
-
-func serverStart(srv *http.Server) error {
-	return srv.ListenAndServe()
-}
 
 type appHandle struct{}
 type debugHandle struct{}
@@ -35,16 +32,16 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 
-	signal.Notify(stop)
+	signal.Notify(stop, syscall.SIGQUIT, syscall.SIGTERM)
 
 	appServer := &http.Server{Addr: ":8080", Handler: &appHandle{}}
 	debugServer := &http.Server{Addr: ":8081", Handler: &debugHandle{}}
 
 	g.Go(func() error {
-		return serverStart(appServer)
+		appServer.ListenAndServe()
 	})
 	g.Go(func() error {
-		return serverStart(debugServer)
+		debugServer.ListenAndServe()
 	})
 
 	g.Go(func() error {
@@ -55,6 +52,8 @@ func main() {
 
 			case <-stop:
 				cancel()
+				appServer.Shutdown()
+				debugServer.Shutdown()
 			}
 		}
 	})
