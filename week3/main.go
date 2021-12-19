@@ -38,10 +38,10 @@ func main() {
 	debugServer := &http.Server{Addr: ":8081", Handler: &debugHandle{}}
 
 	g.Go(func() error {
-		appServer.ListenAndServe()
+		return appServer.ListenAndServe()
 	})
 	g.Go(func() error {
-		debugServer.ListenAndServe()
+		return debugServer.ListenAndServe()
 	})
 
 	g.Go(func() error {
@@ -51,9 +51,9 @@ func main() {
 				return errCtx.Err()
 
 			case <-stop:
+				appServer.Shutdown(errCtx)
+				debugServer.Shutdown(errCtx)
 				cancel()
-				appServer.Shutdown()
-				debugServer.Shutdown()
 			}
 		}
 	})
