@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"sync/errgroup"
@@ -36,7 +35,7 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 
-	signal.Notify(stop, syscall.SIGQUIT, syscall.SIGTERM)
+	signal.Notify(stop)
 
 	appServer := &http.Server{Addr: ":8080", Handler: &appHandle{}}
 	debugServer := &http.Server{Addr: ":8081", Handler: &debugHandle{}}
