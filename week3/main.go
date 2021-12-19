@@ -9,53 +9,59 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"sync/errgroup"
 )
 
-func server(ctx context.Context, addr string, handler http.Handler, stop <-chan os.Signal) error {
-	s := http.Server{
-		Addr:    addr,
-		Handler: handler,
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-stop:
-		fmt.Println("shutdown~~")
-		s.Shutdown(context.Background())
-		return ctx.Err()
-	default:
-		return s.ListenAndServe()
-	}
+func serverStart(srv *http.Server) error {
+	return srv.ListenAndServe()
 }
 
 type appHandle struct{}
+type debugHandle struct{}
 
-func (app *appHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (ah *appHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello App! %s", time.Now())
 }
 
-type debugHandle struct{}
-
-func (debug *debugHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (dh *debugHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello Debug! %s", time.Now())
 }
 
 func main() {
-	g, ctx := errgroup.WithContext(context.Background())
+	ctx := context.Background()
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	g, errCtx := errgroup.WithContext(ctx)
 
 	stop := make(chan os.Signal, 1)
 
 	signal.Notify(stop, syscall.SIGQUIT, syscall.SIGTERM)
 
+	appServer := &http.Server{Addr: ":8080", Handler: &appHandle{}}
+	debugServer := &http.Server{Addr: ":8081", Handler: &debugHandle{}}
+
 	g.Go(func() error {
-		return server(ctx, ":8080", &appHandle{}, stop)
+		return serverStart(appServer)
 	})
 	g.Go(func() error {
-		return server(ctx, ":8081", &debugHandle{}, stop)
+		return serverStart(debugServer)
+	})
+
+	g.Go(func() error {
+		for {
+			select {
+			case <-errCtx.Done():
+				return errCtx.Err()
+
+			case <-stop:
+				cancel()
+			}
+		}
 	})
 
 	if err := g.Wait(); err != nil {
-		fmt.Println(err)
+		fmt.Println("group error:", err)
 	}
+	fmt.Println("All Done")
 }
