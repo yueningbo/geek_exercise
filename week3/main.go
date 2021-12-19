@@ -12,19 +12,21 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func server(addr string, handler http.Handler, stop <-chan os.Signal) error {
+func server(ctx context.Context, addr string, handler http.Handler, stop <-chan os.Signal) error {
 	s := http.Server{
 		Addr:    addr,
 		Handler: handler,
 	}
-
-	go func() {
-		<-stop
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-stop:
 		fmt.Println("shutdown~~")
 		s.Shutdown(context.Background())
-	}()
-
-	return s.ListenAndServe()
+		return ctx.Err()
+	default:
+		return s.ListenAndServe()
+	}
 }
 
 type appHandle struct{}
@@ -40,17 +42,17 @@ func (debug *debugHandle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var g errgroup.Group
+	g, ctx := errgroup.WithContext(context.Background())
 
 	stop := make(chan os.Signal, 1)
 
 	signal.Notify(stop, syscall.SIGQUIT, syscall.SIGTERM)
 
 	g.Go(func() error {
-		return server(":8080", &appHandle{}, stop)
+		return server(ctx, ":8080", &appHandle{}, stop)
 	})
 	g.Go(func() error {
-		return server(":8081", &debugHandle{}, stop)
+		return server(ctx, ":8081", &debugHandle{}, stop)
 	})
 
 	if err := g.Wait(); err != nil {
