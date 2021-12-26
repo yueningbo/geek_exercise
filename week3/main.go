@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"sync/errgroup"
+	"golang.org/x/sync/errgroup"
 )
 
 type appHandle struct{}
